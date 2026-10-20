@@ -3,23 +3,29 @@ node {
     dir('dotnet-demo-app-main') {
         
         stage('Start Environment') {
+            // 1. Download de docker-compose tool tijdelijk in de werkmap van Jenkins
+            sh 'curl -sSL https://github.com/docker/compose/releases/download/v2.25.0/docker-compose-linux-x86_64 -o docker-compose'
+            sh 'chmod +x docker-compose'
+
+            // 2. Gebruik onze gedownloade tool om oude containers af te sluiten
             catchError(buildResult: 'SUCCESS') {
-                sh 'docker compose down'
+                sh './docker-compose down'
             }
-            // 1. Start de MariaDB database en webapp
-            sh 'docker compose up -d --build'
             
-            // 2. Wacht 10 seconden zodat MariaDB volledig kan opstarten
+            // 3. Bouw en start de MariaDB database en webapp
+            sh './docker-compose up -d --build'
+            
+            // 4. Wacht 10 seconden zodat MariaDB volledig kan opstarten
             sleep 10
             
-            // 3. Maak de test-database aan via een tijdelijke MariaDB client!
+            // 5. Maak de test-database aan via een tijdelijke MariaDB client
             sh '''
             docker run --rm --network host mariadb:11 mariadb -h 127.0.0.1 -P 3306 -uroot -psekrit -e "CREATE DATABASE IF NOT EXISTS todo_test_db; GRANT ALL PRIVILEGES ON todo_test_db.* TO 'todo_usr'@'%'; FLUSH PRIVILEGES;"
             '''
         }
         
         stage('Integration Tests') {
-            // We bouwen alleen de containeromgeving (zonder RUN dotnet test erin)
+            // Bouw de containeromgeving
             sh '''
             echo "FROM mcr.microsoft.com/dotnet/sdk:10.0" > Dockerfile.test
             echo "WORKDIR /app" >> Dockerfile.test
@@ -27,7 +33,7 @@ node {
             docker build -t dotnet-test-runner -f Dockerfile.test .
             '''
             
-            // 4. Voer de tests uit en koppel deze aan de host zodat hij de database kan bereiken!
+            // Voer de tests uit gekoppeld aan de database!
             sh 'docker run --rm --network host dotnet-test-runner dotnet test'
         }
     }
