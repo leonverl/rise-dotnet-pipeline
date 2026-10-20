@@ -1,12 +1,14 @@
 node {
+    // 1. Download de daadwerkelijke broncode van GitHub naar de Jenkins werkmap!
+    checkout scm
+
     dir('dotnet-demo-app-main') {
         stage('Unit Tests') {
-            // We omzeilen het mount-probleem door on-the-fly een test-container te bouwen!
             sh '''
             echo "FROM mcr.microsoft.com/dotnet/sdk:10.0" > Dockerfile.test
             echo "WORKDIR /app" >> Dockerfile.test
             echo "COPY . ." >> Dockerfile.test
-            echo "RUN dotnet test TodoApp.Tests/TodoApp.Tests.csproj" >> Dockerfile.test
+            echo "RUN dotnet test" >> Dockerfile.test
             
             docker build -t dotnet-test-runner -f Dockerfile.test .
             '''
