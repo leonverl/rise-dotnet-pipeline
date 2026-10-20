@@ -1,8 +1,15 @@
 node {
     dir('dotnet-demo-app-main') {
         stage('Unit Tests') {
-            // We wijzen hem nu direct naar het specifieke .csproj bestand
-            sh 'docker run --rm -v ${WORKSPACE}/dotnet-demo-app-main:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test TodoApp.Tests/TodoApp.Tests.csproj'
+            // We omzeilen het mount-probleem door on-the-fly een test-container te bouwen!
+            sh '''
+            echo "FROM mcr.microsoft.com/dotnet/sdk:10.0" > Dockerfile.test
+            echo "WORKDIR /app" >> Dockerfile.test
+            echo "COPY . ." >> Dockerfile.test
+            echo "RUN dotnet test TodoApp.Tests/TodoApp.Tests.csproj" >> Dockerfile.test
+            
+            docker build -t dotnet-test-runner -f Dockerfile.test .
+            '''
         }
         stage('Preparation') {
             catchError(buildResult: 'SUCCESS') {
