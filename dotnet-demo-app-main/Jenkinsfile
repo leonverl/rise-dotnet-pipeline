@@ -1,0 +1,13 @@
+node {
+    stage('Unit Tests') {
+                sh 'docker run --rm -v ${WORKSPACE}:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test'
+    }
+    stage('Preparation') {
+        catchError(buildResult: 'SUCCESS') {
+            sh 'docker compose down'
+        }
+    }
+    stage('Build & Deploy') {
+                sh 'docker compose up -d --build'
+    }
+}
