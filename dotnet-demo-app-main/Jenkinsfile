@@ -1,7 +1,8 @@
 node {
     dir('dotnet-demo-app-main') {
         stage('Unit Tests') {
-                        sh 'docker run --rm -v ${WORKSPACE}/dotnet-demo-app-main:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test TodoApp.Tests'
+            // We wijzen hem nu direct naar het specifieke .csproj bestand
+            sh 'docker run --rm -v ${WORKSPACE}/dotnet-demo-app-main:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test TodoApp.Tests/TodoApp.Tests.csproj'
         }
         stage('Preparation') {
             catchError(buildResult: 'SUCCESS') {
