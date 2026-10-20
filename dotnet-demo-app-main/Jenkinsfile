@@ -1,25 +1,34 @@
 node {
-    // 1. Download de daadwerkelijke broncode van GitHub naar de Jenkins werkmap!
     checkout scm
-
     dir('dotnet-demo-app-main') {
-        stage('Unit Tests') {
+        
+        stage('Start Environment') {
+            catchError(buildResult: 'SUCCESS') {
+                sh 'docker compose down'
+            }
+            // 1. Start de MariaDB database en webapp
+            sh 'docker compose up -d --build'
+            
+            // 2. Wacht 10 seconden zodat MariaDB volledig kan opstarten
+            sleep 10
+            
+            // 3. Maak de test-database aan via een tijdelijke MariaDB client!
+            sh '''
+            docker run --rm --network host mariadb:11 mariadb -h 127.0.0.1 -P 3306 -uroot -psekrit -e "CREATE DATABASE IF NOT EXISTS todo_test_db; GRANT ALL PRIVILEGES ON todo_test_db.* TO 'todo_usr'@'%'; FLUSH PRIVILEGES;"
+            '''
+        }
+        
+        stage('Integration Tests') {
+            // We bouwen alleen de containeromgeving (zonder RUN dotnet test erin)
             sh '''
             echo "FROM mcr.microsoft.com/dotnet/sdk:10.0" > Dockerfile.test
             echo "WORKDIR /app" >> Dockerfile.test
             echo "COPY . ." >> Dockerfile.test
-            echo "RUN dotnet test" >> Dockerfile.test
-            
             docker build -t dotnet-test-runner -f Dockerfile.test .
             '''
-        }
-        stage('Preparation') {
-            catchError(buildResult: 'SUCCESS') {
-                sh 'docker compose down'
-            }
-        }
-        stage('Build & Deploy') {
-            sh 'docker compose up -d --build'
+            
+            // 4. Voer de tests uit en koppel deze aan de host zodat hij de database kan bereiken!
+            sh 'docker run --rm --network host dotnet-test-runner dotnet test'
         }
     }
 }
