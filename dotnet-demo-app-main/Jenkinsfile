@@ -1,7 +1,7 @@
 node {
     dir('dotnet-demo-app-main') {
         stage('Unit Tests') {
-                        sh 'docker run --rm -v ${WORKSPACE}/dotnet-demo-app-main:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test'
+                        sh 'docker run --rm -v ${WORKSPACE}/dotnet-demo-app-main:/app -w /app mcr.microsoft.com/dotnet/sdk:10.0 dotnet test TodoApp.Tests'
         }
         stage('Preparation') {
             catchError(buildResult: 'SUCCESS') {
