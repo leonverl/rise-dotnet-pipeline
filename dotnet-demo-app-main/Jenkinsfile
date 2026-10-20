@@ -12,13 +12,15 @@ node {
                 sh './docker-compose down'
             }
             
-            // 3. Bouw en start de MariaDB database en webapp
-            sh './docker-compose up -d --build'
+            // 3. Bouw en start de MariaDB database en webapp (met log-weergave bij een crash)
+            sh '''
             if ! ./docker-compose up -d --build; then
                 echo "--- CRASH LOGS VAN DE DATABASE ---"
                 ./docker-compose logs
                 exit 1
             fi
+            '''
+            
             // 4. Wacht 10 seconden zodat MariaDB volledig kan opstarten
             sleep 10
             
