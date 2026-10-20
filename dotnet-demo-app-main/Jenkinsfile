@@ -1,37 +1,38 @@
 node {
     checkout scm
+    
+    // Zorg dat we in de juiste submap werken
     dir('dotnet-demo-app-main') {
         
         stage('Start Environment') {
-            // 1. Download de docker-compose tool tijdelijk in de werkmap van Jenkins
+            // 1. Download de docker-compose tool tijdelijk in de Jenkins werkmap
             sh 'curl -sSL https://github.com/docker/compose/releases/download/v2.25.0/docker-compose-linux-x86_64 -o docker-compose'
             sh 'chmod +x docker-compose'
 
-            // 2. Gebruik onze gedownloade tool om oude containers af te sluiten
+            // 2. Ruim eventuele oude containers op zodat we met een schone lei beginnen
             catchError(buildResult: 'SUCCESS') {
                 sh './docker-compose down'
             }
             
-            // 3. Bouw en start de MariaDB database en webapp (met log-weergave bij een crash)
-            sh '''
-            if ! ./docker-compose up -d --build; then
-                echo "--- CRASH LOGS VAN DE DATABASE ---"
-                ./docker-compose logs
-                exit 1
-            fi
-            '''
+            // 3. Bouw en start de MariaDB database en de webapp
+            sh './docker-compose up -d --build'
             
-            // 4. Wacht 10 seconden zodat MariaDB volledig kan opstarten
+            // 4. Wacht 10 seconden zodat MariaDB de tijd heeft om volledig op te starten
             sleep 10
             
-            // 5. Maak de test-database aan via een tijdelijke MariaDB client
+            // 5. Maak de test-database aan en verleen de juiste rechten
             sh '''
             docker run --rm --network host mariadb:11 mariadb -h 127.0.0.1 -P 3306 -uroot -psekrit -e "CREATE DATABASE IF NOT EXISTS todo_test_db; GRANT ALL PRIVILEGES ON todo_test_db.* TO 'todo_usr'@'%'; FLUSH PRIVILEGES;"
+            '''
+            
+            // 6. Maak de benodigde 'todos' tabel aan in de zojuist gemaakte test-database
+            sh '''
+            docker run --rm --network host mariadb:11 mariadb -h 127.0.0.1 -P 3306 -utodo_usr -pletmeinplz todo_test_db -e "CREATE TABLE IF NOT EXISTS todos (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, is_done BOOLEAN NOT NULL DEFAULT FALSE, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);"
             '''
         }
         
         stage('Integration Tests') {
-            // Bouw de containeromgeving
+            // 7. Bouw on-the-fly een tijdelijke .NET container speciaal voor de tests
             sh '''
             echo "FROM mcr.microsoft.com/dotnet/sdk:10.0" > Dockerfile.test
             echo "WORKDIR /app" >> Dockerfile.test
@@ -39,7 +40,7 @@ node {
             docker build -t dotnet-test-runner -f Dockerfile.test .
             '''
             
-            // Voer de tests uit gekoppeld aan de database!
+            // 8. Voer de tests uit, gekoppeld aan het host-netwerk zodat ze de MariaDB kunnen bereiken
             sh 'docker run --rm --network host dotnet-test-runner dotnet test'
         }
     }
